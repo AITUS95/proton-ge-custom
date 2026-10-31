@@ -33,6 +33,14 @@ Tested locally on Ubuntu 26.04, NVIDIA RTX 5080 Mobile, XWayland/Wayland, and a 
 
 In the slow case, both D3D9 Present and DirectDraw UpdateOverlay dropped to about one call per second, then recovered to roughly 30/s. The modified region avoided the slowdown but caused an unrelated-looking border artifact. The alpha implementation avoided both symptoms during the observed movie playback.
 
+### Remaining transient on black fades
+
+The user highlighted an intermittent, short-lived **right-edge afterimage** visible as the movie fades to black, resembling a fragment of a previous frame. This is **not** the persistent 10% right-side band from the region-based experiments; the centered image otherwise displays normally with the layered-window path.
+
+The cause is not established. Two competing hypotheses require an A/B check: (1) a tiny amount of stale D3D9 imagery bleeds through the 254/255 layered alpha; (2) WineD3D briefly displays stale edge pixels in its frontbuffer. The experimental patch exposes `GF_DDRAW_OPAQUE=1` (255/255 alpha) as a **diagnostic only**. It may bring back the previously observed ~1 FPS throttling, and must not be treated as the final fix. If the afterimage persists when fully opaque, alpha leakage alone cannot explain it.
+
+Do not change video cropping, overlay rectangles, or use `SetWindowRgn()`: these experiments were unsuccessful or produced new rendering artifacts.
+
 The alpha result was obtained from an experimental locally compiled Wine DLL. The cleaned-up standalone `0076` patch in this PR is reconstructed from the tested approach and **has not yet been independently built or regression-tested**.
 
 ## Remaining work before marking the PR ready
@@ -40,7 +48,7 @@ The alpha result was obtained from an experimental locally compiled Wine DLL. Th
 - Compile and test the clean `0076` patch on top of the current GE video patch series.
 - Confirm that the change to `device_parent_mode_changed()` avoids `Failed to resize window` and does not break fullscreen restoration.
 - Verify multiple FMVs, black transitions, gameplay return, focus changes, resizing, and window destruction.
-- Investigate the small right-edge flash on fade-to-black.
+- Isolate the transient right-edge afterimage on black fades (alpha leakage vs. stale WineD3D pixels).
 - Check behavior with other display servers, compositors, resolutions, and WineD3D backends.
 - Keep the workaround game-scoped or opt-in until broader compatibility is established; never replace the stock build solely on this evidence.
 
