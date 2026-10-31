@@ -86,7 +86,7 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
      {
          /* Nothing to do, we control the frontbuffer, or at least the parts we
           * care about. */
-@@ -4163,7 +4164,126 @@
+@@ -4163,7 +4164,134 @@
  /* Wine has no hardware overlays: the visible overlay is drawn over its
   * destination when that is presented (see ddraw_surface_update_frontbuffer()).
   * Only one overlay is shown at a time. */
@@ -127,11 +127,12 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
 +
 +    if (IsWindow(window) && !DestroyWindow(window))
 +    {
++        DWORD error = GetLastError();
 +        ShowWindow(window, SW_HIDE);
-+        WARN("GF-DDRAW-WINDOW: DestroyWindow failed, error %lu.\\n", GetLastError());
++        WARN("GF-DDRAW-WINDOW: DestroyWindow failed, error %lu.\n", error);
 +    }
 +
-+    WARN("GF-DDRAW-WINDOW: closed.\\n");
++    WARN("GF-DDRAW-WINDOW: closed.\n");
 +}
 +
 +static void ddraw_gf_prepare_overlay_window(struct ddraw *ddraw)
@@ -159,11 +160,18 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
 +        return;
 +
 +    window = ddraw->gf_overlay_window;
++    /* Recover from unexpected destruction of the transient popup. */
++    if (window && !IsWindow(window))
++    {
++        ddraw_gf_close_overlay_window(ddraw);
++        window = NULL;
++    }
++
 +    if (!window)
 +    {
 +        if (ddraw->swapchain_window != ddraw->dest_window)
 +        {
-+            WARN("GF-DDRAW-WINDOW: unexpected swapchain window %p, game %p.\\n",
++            WARN("GF-DDRAW-WINDOW: unexpected swapchain window %p, game %p.\n",
 +                    ddraw->swapchain_window, ddraw->dest_window);
 +            return;
 +        }
@@ -173,13 +181,13 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
 +                origin.x, origin.y, width, height, ddraw->dest_window, NULL, NULL, NULL);
 +        if (!window)
 +        {
-+            WARN("GF-DDRAW-WINDOW: creation failed, error %lu.\\n", GetLastError());
++            WARN("GF-DDRAW-WINDOW: creation failed, error %lu.\n", GetLastError());
 +            return;
 +        }
 +
 +        if (!SetLayeredWindowAttributes(window, 0, 254, LWA_ALPHA))
 +        {
-+            WARN("GF-DDRAW-WINDOW: layered attributes failed, error %lu.\\n", GetLastError());
++            WARN("GF-DDRAW-WINDOW: layered attributes failed, error %lu.\n", GetLastError());
 +            DestroyWindow(window);
 +            return;
 +        }
@@ -187,7 +195,7 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
 +        if (!SetWindowPos(window, HWND_TOPMOST, origin.x, origin.y,
 +                width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW))
 +        {
-+            WARN("GF-DDRAW-WINDOW: positioning failed, error %lu.\\n", GetLastError());
++            WARN("GF-DDRAW-WINDOW: positioning failed, error %lu.\n", GetLastError());
 +            DestroyWindow(window);
 +            return;
 +        }
@@ -197,7 +205,7 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
 +        wined3d_swapchain_set_window(ddraw->wined3d_swapchain, window);
 +        ddraw_set_swapchain_window(ddraw, window);
 +
-+        WARN("GF-DDRAW-WINDOW: opened %p at %d,%d size %dx%d opacity=254/255.\\n",
++        WARN("GF-DDRAW-WINDOW: opened %p at %d,%d size %dx%d opacity=254/255.\n",
 +                window, origin.x, origin.y, width, height);
 +    }
 +    else if (GetWindowRect(window, &current)
@@ -214,7 +222,7 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
          struct ddraw_surface *dst, const RECT *dst_rect, DWORD flags)
  {
      struct ddraw *ddraw = overlay->ddraw;
-@@ -4176,7 +4296,8 @@
+@@ -4176,7 +4304,8 @@
      {
          if (ddraw->overlay != overlay)
              return;
@@ -224,7 +232,7 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
          old_dst_rect = ddraw->overlay_dst_rect;
          ddraw->overlay = ddraw->overlay_dst = NULL;
          /* Uncover the destination. */
-@@ -4221,7 +4342,8 @@
+@@ -4221,7 +4350,8 @@
      else
          SetRect(&ddraw->overlay_dst_rect, 0, 0, dst->surface_desc.dwWidth, dst->surface_desc.dwHeight);
  
@@ -234,7 +242,7 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
  }
  
  /*****************************************************************************
-@@ -6324,8 +6446,11 @@
+@@ -6324,8 +6454,11 @@
          surface->ddraw->gdi_surface = NULL;
      }
  
