@@ -58,6 +58,19 @@ There was an approximately **492 ms period without the overlay popup**. This mak
 
 The initial alpha result was obtained from an experimental local Wine DLL. The cleaned-up standalone `0076` patch **was subsequently compiled and loaded** in the diagnostic Proton environment: its `GF-DDRAW-WINDOW: opened ... opacity=255/255` markers were observed with `GF_DDRAW_OPAQUE=1`. This verifies that the newer implementation built and ran, but **does not establish that the layered 254/255 path or lifecycle fixes have passed all regression tests**.
 
+## Offline VP6 comparison (user-supplied image sheets)
+
+The game installation's `Paramount.vp6` was decoded outside Wine using FFmpeg and two contact sheets were shared:
+
+- `paramount_panoramica.png`: samples progress through the Paramount logo's fade-to-black without an obvious persistent right-edge vertical afterimage.
+- `paramount_ultimi_30_frame.png`: its entire RGB bitmap is black (every pixel is `0,0,0`), consistent with a clean all-black tail.
+
+This strongly favors an artifact in the **video presentation path** rather than an intentional visible stripe encoded into the intro. However, a tiled contact sheet is not a pixel-by-pixel inspection of **every** decoded VP6 frame, nor does it prove where the stray pixels originate. A precise compositor capture aligned to the flicker or a raw/decoded frame check remains useful.
+
+The user reports the narrow right-edge trace **starting during the Paramount fade**, then briefly flashing against the black screen before the Electronic Arts title. Therefore a correction that *only* runs on `DDOVER_HIDE` might be too late: the suspect pixels may already have appeared during ordinary overlay updates.
+
+**Do not introduce an arbitrary edge crop or black stripe:** first establish whether the pixels appear in the overlay source, the WineD3D destination before presentation, or the compositor's final output. Keep the proven 254/255 window behavior unchanged.
+
 ## Remaining work before marking the PR ready
 
 - [Build completed] The clean `0076` patch compiled and was loaded (verified with `opacity=255/255`), but further runtime/regression validation is required.
