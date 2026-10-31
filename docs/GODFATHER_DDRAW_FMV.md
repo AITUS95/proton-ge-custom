@@ -43,11 +43,24 @@ This falsifies *simple alpha bleed-through as the sole explanation* for the afte
 
 Do not change video cropping, overlay rectangles, or use `SetWindowRgn()`: these experiments were unsuccessful or produced new rendering artifacts.
 
-The alpha result was obtained from an experimental locally compiled Wine DLL. The cleaned-up standalone `0076` patch in this PR is reconstructed from the tested approach and **has not yet been independently built or regression-tested**.
+### Overlay transition trace in the opaque test
+
+A subsequent read of the same `GF_DDRAW_OPAQUE=1` log showed:
+
+| Event | Wine log timestamp |
+| --- | ---: |
+| `DDOVER_HIDE` (`UpdateOverlay flags 0x200`) | 48013.680 |
+| `GF-DDRAW-WINDOW: closed` | 48013.684 |
+| Next `GF-DDRAW-WINDOW: opened` | 48014.176 |
+
+There was an approximately **492 ms period without the overlay popup**. This makes window lifecycle / exposure of the underlying D3D9 surface a reasonable investigation path, but **there is no timestamp for the visible flash**, so it remains unproven that the flash occurred during that interval. Avoid interpreting `DDOVER_HIDE` as a failure: it is an expected overlay lifecycle event.
+
+
+The initial alpha result was obtained from an experimental local Wine DLL. The cleaned-up standalone `0076` patch **was subsequently compiled and loaded** in the diagnostic Proton environment: its `GF-DDRAW-WINDOW: opened ... opacity=255/255` markers were observed with `GF_DDRAW_OPAQUE=1`. This verifies that the newer implementation built and ran, but **does not establish that the layered 254/255 path or lifecycle fixes have passed all regression tests**.
 
 ## Remaining work before marking the PR ready
 
-- Compile and test the clean `0076` patch on top of the current GE video patch series.
+- [Build completed] The clean `0076` patch compiled and was loaded (verified with `opacity=255/255`), but further runtime/regression validation is required.
 - Confirm that the change to `device_parent_mode_changed()` avoids `Failed to resize window` and does not break fullscreen restoration.
 - Verify multiple FMVs, black transitions, gameplay return, focus changes, resizing, and window destruction.
 - Determine whether the afterimage coincides with overlay hide/close/reopen or occurs between ordinary overlay flips. Opacity 255/255 did not remove it.
