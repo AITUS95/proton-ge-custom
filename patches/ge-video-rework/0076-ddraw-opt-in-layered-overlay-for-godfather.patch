@@ -86,7 +86,7 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
      {
          /* Nothing to do, we control the frontbuffer, or at least the parts we
           * care about. */
-@@ -4163,7 +4164,134 @@
+@@ -4163,7 +4164,141 @@
  /* Wine has no hardware overlays: the visible overlay is drawn over its
   * destination when that is presented (see ddraw_surface_update_frontbuffer()).
   * Only one overlay is shown at a time. */
@@ -141,6 +141,8 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
 +    RECT client, current;
 +    POINT origin = {0, 0};
 +    int width, height;
++    BYTE opacity = 254;
++    char opaque_value[4];
 +
 +    if (!ddraw_gf_overlay_enabled()
 +            || !(ddraw->cooperative_level & DDSCL_EXCLUSIVE)
@@ -185,7 +187,12 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
 +            return;
 +        }
 +
-+        if (!SetLayeredWindowAttributes(window, 0, 254, LWA_ALPHA))
++        /* Diagnostic: test fully opaque layered presentation without a rebuild. */
++        if (GetEnvironmentVariableA("GF_DDRAW_OPAQUE", opaque_value, sizeof(opaque_value)) == 1
++                && opaque_value[0] == '1')
++            opacity = 255;
++
++        if (!SetLayeredWindowAttributes(window, 0, opacity, LWA_ALPHA))
 +        {
 +            WARN("GF-DDRAW-WINDOW: layered attributes failed, error %lu.\n", GetLastError());
 +            DestroyWindow(window);
@@ -205,8 +212,8 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
 +        wined3d_swapchain_set_window(ddraw->wined3d_swapchain, window);
 +        ddraw_set_swapchain_window(ddraw, window);
 +
-+        WARN("GF-DDRAW-WINDOW: opened %p at %d,%d size %dx%d opacity=254/255.\n",
-+                window, origin.x, origin.y, width, height);
++        WARN("GF-DDRAW-WINDOW: opened %p at %d,%d size %dx%d opacity=%u/255.\n",
++                window, origin.x, origin.y, width, height, opacity);
 +    }
 +    else if (GetWindowRect(window, &current)
 +            && (current.left != origin.x || current.top != origin.y
@@ -222,7 +229,7 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
          struct ddraw_surface *dst, const RECT *dst_rect, DWORD flags)
  {
      struct ddraw *ddraw = overlay->ddraw;
-@@ -4176,7 +4304,8 @@
+@@ -4176,7 +4311,8 @@
      {
          if (ddraw->overlay != overlay)
              return;
@@ -232,7 +239,7 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
          old_dst_rect = ddraw->overlay_dst_rect;
          ddraw->overlay = ddraw->overlay_dst = NULL;
          /* Uncover the destination. */
-@@ -4221,7 +4350,8 @@
+@@ -4221,7 +4357,8 @@
      else
          SetRect(&ddraw->overlay_dst_rect, 0, 0, dst->surface_desc.dwWidth, dst->surface_desc.dwHeight);
  
@@ -242,7 +249,7 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
  }
  
  /*****************************************************************************
-@@ -6324,8 +6454,11 @@
+@@ -6324,8 +6461,11 @@
          surface->ddraw->gdi_surface = NULL;
      }
  
