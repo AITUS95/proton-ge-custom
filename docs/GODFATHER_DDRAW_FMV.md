@@ -37,7 +37,9 @@ In the slow case, both D3D9 Present and DirectDraw UpdateOverlay dropped to abou
 
 The user highlighted an intermittent, short-lived **right-edge afterimage** visible as the movie fades to black, resembling a fragment of a previous frame. This is **not** the persistent 10% right-side band from the region-based experiments; the centered image otherwise displays normally with the layered-window path.
 
-The cause is not established. Two competing hypotheses require an A/B check: (1) a tiny amount of stale D3D9 imagery bleeds through the 254/255 layered alpha; (2) WineD3D briefly displays stale edge pixels in its frontbuffer. The experimental patch exposes `GF_DDRAW_OPAQUE=1` (255/255 alpha) as a **diagnostic only**. It may bring back the previously observed ~1 FPS throttling, and must not be treated as the final fix. If the afterimage persists when fully opaque, alpha leakage alone cannot explain it.
+The cause is not established. Two competing hypotheses require an A/B check: (1) a tiny amount of stale D3D9 imagery bleeds through the 254/255 layered alpha; (2) WineD3D briefly displays stale edge pixels in its frontbuffer. The experimental patch exposes `GF_DDRAW_OPAQUE=1` (255/255 alpha) as a **diagnostic only**. It may bring back the previously observed ~1 FPS throttling, and must not be treated as the final fix. **Observed on 2026-10-31:** With `GF_DDRAW_OPAQUE=1`, diagnostic logging confirmed the popup at `opacity=255/255` on two FMV openings. The user reported both **renewed slow playback** and the **same right-edge flash**. The tested log excerpt contained **no** `device_parent_mode_changed: Failed to resize window` errors, although this is not full lifecycle validation.
+
+This falsifies *simple alpha bleed-through as the sole explanation* for the afterimage. The next diagnostic target is whether the flash aligns with an overlay-window close/reopen boundary or occurs during normal overlay flips. Check `GF-DDRAW-WINDOW: closed`, `GF-DDRAW-WINDOW: opened`, and `ddraw_surface7_UpdateOverlay` around the visible transition before attempting another rendering patch.
 
 Do not change video cropping, overlay rectangles, or use `SetWindowRgn()`: these experiments were unsuccessful or produced new rendering artifacts.
 
@@ -48,7 +50,7 @@ The alpha result was obtained from an experimental locally compiled Wine DLL. Th
 - Compile and test the clean `0076` patch on top of the current GE video patch series.
 - Confirm that the change to `device_parent_mode_changed()` avoids `Failed to resize window` and does not break fullscreen restoration.
 - Verify multiple FMVs, black transitions, gameplay return, focus changes, resizing, and window destruction.
-- Isolate the transient right-edge afterimage on black fades (alpha leakage vs. stale WineD3D pixels).
+- Determine whether the afterimage coincides with overlay hide/close/reopen or occurs between ordinary overlay flips. Opacity 255/255 did not remove it.
 - Check behavior with other display servers, compositors, resolutions, and WineD3D backends.
 - Keep the workaround game-scoped or opt-in until broader compatibility is established; never replace the stock build solely on this evidence.
 
