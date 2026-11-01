@@ -93,12 +93,31 @@ The evidence supports a **transient window/compositor edge** or a presentation b
 
 **Next diagnostic:** a new opt-in `GF_DDRAW_DEFER_SHOW=1` flag changes the popup order: create/position the popup *hidden*, rebind the DirectDraw swapchain, submit the initial overlay blit, and **only then** show it. This tests whether presenting an as-yet-uninitialized popup exposes a right-edge stripe. This ordering is a hypothesis, not a proven fix; WineD3D may queue the blit asynchronously, and rendering while hidden might fail on some backends. The mode must be used only for A/B testing, with the established 254/255 alpha unchanged. If it regresses video playback or fails to eliminate the flash, disable the variable; the default path remains untouched.
 
+## Deferred-show trial: visual artifact eliminated (2026-11-01)
+
+The user built the updated `0076` patch with `GF_DDRAW_DEFER_SHOW=1` while retaining `GF_DDRAW_SEPARATE_WINDOW=1 GF_DDRAW_ALPHA_TEST=1` (layered opacity 254/255). On the next manual test, the user reported **the narrow right-edge trace had disappeared**.
+
+Relevant Wine log excerpts:
+
+```text
+53641.707 GF-DDRAW-WINDOW: opened ... size 800x600 opacity=254/255.
+53641.707 GF-DDRAW-DEFER-SHOW: first blit submitted before show.
+53658.661 GF-DDRAW-WINDOW: closed.
+53658.838 GF-DDRAW-WINDOW: opened ... size 800x600 opacity=254/255.
+53659.059 GF-DDRAW-DEFER-SHOW: first blit submitted before show.
+```
+
+There were no `err:ddraw:` lines in the provided filtered output. The second popup was shown about 221 ms after the log for its creation. The debug marker reports that the first blit was **submitted**, not necessarily completed on the GPU; we must not imply a GPU presentation fence.
+
+**Outcome:** deferred showing of the layered popup **eliminated the observed 3-pixel right-edge flash in this run**. That is stronger evidence for a window-mapping/presentation-order artifact than a corrupted VP6 frame. The report did **not** independently quantify FMV FPS in this run, and no post-FMV gameplay/focus/resolution regression tests were provided. Keep the PR in draft until those checks are completed; do not promote the diagnostic switch to default or remove its fallback prematurely.
+
 ## Remaining work before marking the PR ready
 
 - [Build completed] The clean `0076` patch compiled and was loaded (verified with `opacity=255/255`), but further runtime/regression validation is required.
 - Confirm that the change to `device_parent_mode_changed()` avoids `Failed to resize window` and does not break fullscreen restoration.
 - Verify multiple FMVs, black transitions, gameplay return, focus changes, resizing, and window destruction.
-- Compare default presentation with the opt-in deferred-show experiment during the measured 3px, two-frame fade transition; confirm frame timing and ensure the test does not reintroduce slowdown.
+- [x] Verify that the opt-in deferred-show experiment eliminates the right-edge flash in a manual run (user-reported success).
+- [ ] Measure smooth playback/FPS and verify return to gameplay, focus changes, and repeated FMVs with deferred-show enabled.
 - Check behavior with other display servers, compositors, resolutions, and WineD3D backends.
 - Keep the workaround game-scoped or opt-in until broader compatibility is established; never replace the stock build solely on this evidence.
 
