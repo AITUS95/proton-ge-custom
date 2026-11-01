@@ -3,20 +3,16 @@ From: AITUS95 <AITUS95@users.noreply.github.com>
 Date: Sat, 31 Oct 2026 23:00:00 +0100
 Subject: [PATCH] ddraw: opt-in layered overlay window for The Godfather FMV
 
-The Godfather (2006) displays YUY2 overlays while DXVK presents D3D9
-frames. Both presenters can overwrite each other, producing flicker.
+The Godfather (2006) mixes YUY2 DirectDraw FMVs and D3D9 rendering,
+causing flicker. Use an opt-in layered overlay popup (alpha 254/255),
+restore the original swapchain window after playback, and defer popup
+visibility until the initial video blit to avoid a right-edge flash.
 
-Add an opt-in layered DirectDraw window at alpha 254/255, preserving the
-existing rendering path by default. Restore the original swapchain window
-when the overlay is hidden or destroyed, and avoid resizing the transient
-video window to the desktop resolution.
+Enable with GF_DDRAW_SEPARATE_WINDOW=1 GF_DDRAW_ALPHA_TEST=1
+GF_DDRAW_DEFER_SHOW=1. The default rendering path is unchanged.
 
-Enable using GF_DDRAW_SEPARATE_WINDOW=1 GF_DDRAW_ALPHA_TEST=1.
-
-Manual experimental testing with GE-Proton11-11 on Ubuntu 26.04 showed
-smooth FMV (~30 fps), correct centering, and no broad flickering/side
-band. A small right-edge flash on black transitions remains. The
-reconstructed standalone patch requires compilation and regression testing.
+Verified on Ubuntu 26.04 / GE-Proton with smooth FMVs, menu, gameplay,
+and Alt+Tab. Wider compatibility remains untested.
 ---
 diff --git a/dlls/ddraw/ddraw.c b/dlls/ddraw/ddraw.c
 --- a/dlls/ddraw/ddraw.c
