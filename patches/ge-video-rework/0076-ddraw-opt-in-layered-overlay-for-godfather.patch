@@ -86,7 +86,7 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
      {
          /* Nothing to do, we control the frontbuffer, or at least the parts we
           * care about. */
-@@ -4163,7 +4164,141 @@
+@@ -4163,7 +4164,146 @@
  /* Wine has no hardware overlays: the visible overlay is drawn over its
   * destination when that is presented (see ddraw_surface_update_frontbuffer()).
   * Only one overlay is shown at a time. */
@@ -142,7 +142,8 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
 +    POINT origin = {0, 0};
 +    int width, height;
 +    BYTE opacity = 254;
-+    char opaque_value[4];
++    char opaque_value[4], defer_value[4];
++    BOOL defer_show;
 +
 +    if (!ddraw_gf_overlay_enabled()
 +            || !(ddraw->cooperative_level & DDSCL_EXCLUSIVE)
@@ -199,8 +200,12 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
 +            return;
 +        }
 +
++        /* Diagnostic only: avoid exposing the popup before its first blit. */
++        defer_show = GetEnvironmentVariableA("GF_DDRAW_DEFER_SHOW",
++                defer_value, sizeof(defer_value)) == 1 && defer_value[0] == '1';
++
 +        if (!SetWindowPos(window, HWND_TOPMOST, origin.x, origin.y,
-+                width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW))
++                width, height, SWP_NOACTIVATE | (defer_show ? 0 : SWP_SHOWWINDOW)))
 +        {
 +            WARN("GF-DDRAW-WINDOW: positioning failed, error %lu.\n", GetLastError());
 +            DestroyWindow(window);
@@ -229,7 +234,7 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
          struct ddraw_surface *dst, const RECT *dst_rect, DWORD flags)
  {
      struct ddraw *ddraw = overlay->ddraw;
-@@ -4176,7 +4311,8 @@
+@@ -4176,7 +4316,8 @@
      {
          if (ddraw->overlay != overlay)
              return;
@@ -239,17 +244,33 @@ diff --git a/dlls/ddraw/surface.c b/dlls/ddraw/surface.c
          old_dst_rect = ddraw->overlay_dst_rect;
          ddraw->overlay = ddraw->overlay_dst = NULL;
          /* Uncover the destination. */
-@@ -4221,7 +4357,8 @@
+@@ -4221,7 +4362,24 @@
      else
          SetRect(&ddraw->overlay_dst_rect, 0, 0, dst->surface_desc.dwWidth, dst->surface_desc.dwHeight);
  
 -    ddraw_surface_update_overlay_dst(ddraw);
 +    ddraw_gf_prepare_overlay_window(ddraw);
 +    ddraw_surface_update_overlay_dst(ddraw);
++
++    /* Experiment: show only after the initial overlay blit was submitted. */
++    {
++        char value[4];
++
++        if (ddraw->gf_overlay_window
++                && GetEnvironmentVariableA("GF_DDRAW_DEFER_SHOW", value, sizeof(value)) == 1
++                && value[0] == '1' && !IsWindowVisible(ddraw->gf_overlay_window))
++        {
++            if (!SetWindowPos(ddraw->gf_overlay_window, HWND_TOPMOST, 0, 0, 0, 0,
++                    SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW))
++                WARN("GF-DDRAW-DEFER-SHOW: show failed, error %lu.\n", GetLastError());
++            else
++                WARN("GF-DDRAW-DEFER-SHOW: first blit submitted before show.\n");
++        }
++    }
  }
  
  /*****************************************************************************
-@@ -6324,8 +6461,11 @@
+@@ -6324,8 +6482,11 @@
          surface->ddraw->gdi_surface = NULL;
      }
  
