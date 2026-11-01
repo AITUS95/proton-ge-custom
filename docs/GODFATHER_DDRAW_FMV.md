@@ -109,7 +109,7 @@ Relevant Wine log excerpts:
 
 There were no `err:ddraw:` lines in the provided filtered output. The second popup was shown about 221 ms after the log for its creation. The debug marker reports that the first blit was **submitted**, not necessarily completed on the GPU; we must not imply a GPU presentation fence.
 
-**Outcome:** deferred showing of the layered popup **eliminated the observed 3-pixel right-edge flash in this run**. That is stronger evidence for a window-mapping/presentation-order artifact than a corrupted VP6 frame. The report did **not** independently quantify FMV FPS in this run, and no post-FMV gameplay/focus/resolution regression tests were provided. Keep the PR in draft until those checks are completed; do not promote the diagnostic switch to default or remove its fallback prematurely.
+**Outcome:** deferred showing of the layered popup **eliminated the observed 3-pixel right-edge flash in this run**. That is stronger evidence for a window-mapping/presentation-order artifact than a corrupted VP6 frame. Subsequent trace analysis **did quantify overlay update cadence** during this run: movie 1 reported 29, 30, 30, and 30 `UpdateOverlay(DDOVER_SHOW)` calls over four consecutive one-second windows; movie 2 reported 25, 25, 25, and 25. The earlier ~1 update/s throttling did **not** recur in the measured windows. These counts are API update rates, not independently measured monitor/displayed frame rates. The second movie's steady 25/s cadence may reflect its encoded source frame rate; the corresponding original source has not yet been identified and verified. No post-FMV gameplay/focus/resolution regression tests were provided. Keep the PR in draft until those checks are completed; do not promote the diagnostic switch to default or remove its fallback prematurely.
 
 ## Remaining work before marking the PR ready
 
@@ -117,7 +117,9 @@ There were no `err:ddraw:` lines in the provided filtered output. The second pop
 - Confirm that the change to `device_parent_mode_changed()` avoids `Failed to resize window` and does not break fullscreen restoration.
 - Verify multiple FMVs, black transitions, gameplay return, focus changes, resizing, and window destruction.
 - [x] Verify that the opt-in deferred-show experiment eliminates the right-edge flash in a manual run (user-reported success).
-- [ ] Measure smooth playback/FPS and verify return to gameplay, focus changes, and repeated FMVs with deferred-show enabled.
+- [x] Measure `UpdateOverlay` cadence with deferred-show: 29–30/s on first movie, steady 25/s on second movie; no 1/s stall in sampled intervals.
+- [ ] Verify the original source frame rate for the second movie (25 FPS vs unintended cadence).
+- [ ] Verify return to gameplay, focus changes, resolutions, and repeated FMVs with deferred-show enabled.
 - Check behavior with other display servers, compositors, resolutions, and WineD3D backends.
 - Keep the workaround game-scoped or opt-in until broader compatibility is established; never replace the stock build solely on this evidence.
 
