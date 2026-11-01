@@ -11,12 +11,12 @@ The game uses YUY2 DirectDraw overlay video (640×480, displayed at 800×600) wh
 Enable both environment variables:
 
 ```sh
-GF_DDRAW_SEPARATE_WINDOW=1 GF_DDRAW_ALPHA_TEST=1 %command%
+GF_DDRAW_SEPARATE_WINDOW=1 GF_DDRAW_ALPHA_TEST=1 GF_DDRAW_DEFER_SHOW=1 %command%
 ```
 
 The Wine patch creates a dedicated topmost DirectDraw popup for the active overlay, with `WS_EX_LAYERED` and alpha **254/255**. It rebinds the DirectDraw swapchain to the transient window, restores the original target when the overlay is hidden or destroyed, and avoids resizing the transient popup during an exclusive-mode notification.
 
-The second variable remains named `GF_DDRAW_ALPHA_TEST` because this is an experimental implementation; the two variables together are required.
+The variable `GF_DDRAW_ALPHA_TEST` retains its experimental name. The three variables shown above enable the user-validated configuration, including delayed display of the popup until after the initial overlay blit is submitted. Without `GF_DDRAW_DEFER_SHOW=1`, a brief right-edge flash was reproducible in the original test environment.
 
 ## Manual diagnostic results
 
@@ -109,7 +109,9 @@ Relevant Wine log excerpts:
 
 There were no `err:ddraw:` lines in the provided filtered output. The second popup was shown about 221 ms after the log for its creation. The debug marker reports that the first blit was **submitted**, not necessarily completed on the GPU; we must not imply a GPU presentation fence.
 
-**Outcome:** deferred showing of the layered popup **eliminated the observed 3-pixel right-edge flash in this run**. That is stronger evidence for a window-mapping/presentation-order artifact than a corrupted VP6 frame. Subsequent trace analysis **did quantify overlay update cadence** during this run: movie 1 reported 29, 30, 30, and 30 `UpdateOverlay(DDOVER_SHOW)` calls over four consecutive one-second windows; movie 2 reported 25, 25, 25, and 25. The earlier ~1 update/s throttling did **not** recur in the measured windows. These counts are API update rates, not independently measured monitor/displayed frame rates. The second movie's steady 25/s cadence may reflect its encoded source frame rate; the corresponding original source has not yet been identified and verified. No post-FMV gameplay/focus/resolution regression tests were provided. Keep the PR in draft until those checks are completed; do not promote the diagnostic switch to default or remove its fallback prematurely.
+**Outcome:** deferred showing of the layered popup **eliminated the observed 3-pixel right-edge flash in this run**. That is stronger evidence for a window-mapping/presentation-order artifact than a corrupted VP6 frame. Subsequent trace analysis **did quantify overlay update cadence** during this run: movie 1 reported 29, 30, 30, and 30 `UpdateOverlay(DDOVER_SHOW)` calls over four consecutive one-second windows; movie 2 reported 25, 25, 25, and 25. The earlier ~1 update/s throttling did **not** recur in the measured windows. These counts are API update rates, not independently measured monitor/displayed frame rates. A subsequent `ffprobe -f ea` inspection of the installed originals found `paramount.vp6` with `avg_frame_rate=982047/32767` (about 29.9706 FPS) and `load.vp6` with `avg_frame_rate=819175/32767` (exactly 25 FPS). These source rates agree with the two observed update cadences, although the exact mapping between each game playback segment and file was not independently instrumented.
+
+**Manual regression confirmation:** the user subsequently reported that the main menu, entering gameplay, and switching away from and back to the game with Alt+Tab all work with the layered alpha 254/255 + deferred-show configuration. No new visual artifacts were reported. Thus the previously reported functional tests passed on this laptop; broader cross-compositor/hardware validation and repeat-run robustness remain open. Keep the PR in draft for code review and broader testing; do not change the default Wine path prematurely.
 
 ## Remaining work before marking the PR ready
 
@@ -118,8 +120,9 @@ There were no `err:ddraw:` lines in the provided filtered output. The second pop
 - Verify multiple FMVs, black transitions, gameplay return, focus changes, resizing, and window destruction.
 - [x] Verify that the opt-in deferred-show experiment eliminates the right-edge flash in a manual run (user-reported success).
 - [x] Measure `UpdateOverlay` cadence with deferred-show: 29–30/s on first movie, steady 25/s on second movie; no 1/s stall in sampled intervals.
-- [ ] Verify the original source frame rate for the second movie (25 FPS vs unintended cadence).
-- [ ] Verify return to gameplay, focus changes, resolutions, and repeated FMVs with deferred-show enabled.
+- [x] Compare the installed VP6 frame rates: `paramount.vp6` ~29.9706 FPS; `load.vp6` 25 FPS. Both match the measured overlay cadence.
+- [x] User-confirmed manual main-menu entry, gameplay launch, and Alt+Tab return with deferred-show enabled.
+- [ ] Validate additional screen resolutions, focus corner cases, and repeat-run FMVs; test on other WineD3D/compositor configurations.
 - Check behavior with other display servers, compositors, resolutions, and WineD3D backends.
 - Keep the workaround game-scoped or opt-in until broader compatibility is established; never replace the stock build solely on this evidence.
 
