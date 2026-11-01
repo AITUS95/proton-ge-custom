@@ -71,12 +71,32 @@ The user reports the narrow right-edge trace **starting during the Paramount fad
 
 **Do not introduce an arbitrary edge crop or black stripe:** first establish whether the pixels appear in the overlay source, the WineD3D destination before presentation, or the compositor's final output. Keep the proven 254/255 window behavior unchanged.
 
+## Measured capture evidence: two-frame right-edge flash
+
+A real-time 60 FPS gameplay recording, supplied as `Replay_2026-11-01_01-03-46.mp4`, was inspected frame by frame. Format: H.264, 2560×1600, 1,243 decoded frames, duration about 20.72 seconds.
+
+The Paramount logo fades from approximately 15.3 to 16.2 seconds. The screen is fully black for a long interval, then the following **two consecutive video frames** show an isolated border artifact:
+
+| Frame (zero-based) | Timestamp | Observation |
+| ---: | ---: | --- |
+| 1085 | 18.0833 s | Completely black |
+| **1086** | **18.1000 s** | Full-height vertical line at x=2344–2346 |
+| **1087** | **18.1167 s** | Identical full-height vertical line |
+| 1088 | 18.1333 s | Completely black again |
+| 1091 | 18.1833 s | Electronic Arts text starts appearing |
+
+The measured stripe is exactly **3 screen pixels** wide, spanning y=0–1599. Each affected column is **uniform across all 1,600 rows**, with decoded pixel values in BGR approximately (26,29,27), (116,119,117), and (13,16,14), respectively. All other pixels in the two affected frames are black. The artifact lasts about **33.3 ms** at 60 FPS.
+
+The evidence supports a **transient window/compositor edge** or a presentation boundary problem much more strongly than a colorful residual VP6 image. A gray solid line that stretches across the *entire* monitor is not characteristic of a stale Paramount frame. The capture does **not** by itself prove which Wine/XWayland/X11 event causes the line.
+
+**Next discriminating step:** correlate the video timestamp of the second overlay with `GF-DDRAW-WINDOW: opened` and `closed` entries from the **same game run**. Previous logs from different runs must not be assumed temporally aligned with this capture. Then instrument or adjust popup mapping/presentation order only if correlation supports it. Preserve default layered alpha 254/255 and keep the 255/255 diagnostic disabled.
+
 ## Remaining work before marking the PR ready
 
 - [Build completed] The clean `0076` patch compiled and was loaded (verified with `opacity=255/255`), but further runtime/regression validation is required.
 - Confirm that the change to `device_parent_mode_changed()` avoids `Failed to resize window` and does not break fullscreen restoration.
 - Verify multiple FMVs, black transitions, gameplay return, focus changes, resizing, and window destruction.
-- Determine whether the afterimage coincides with overlay hide/close/reopen or occurs between ordinary overlay flips. Opacity 255/255 did not remove it.
+- Correlate the precisely measured two-frame 3px border flash at 18.100–18.117 s with window mapping/show and overlay lifecycle events from the same run; the previous opaque test did not eliminate it.
 - Check behavior with other display servers, compositors, resolutions, and WineD3D backends.
 - Keep the workaround game-scoped or opt-in until broader compatibility is established; never replace the stock build solely on this evidence.
 
