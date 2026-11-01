@@ -89,14 +89,16 @@ The measured stripe is exactly **3 screen pixels** wide, spanning y=0–1599. Ea
 
 The evidence supports a **transient window/compositor edge** or a presentation boundary problem much more strongly than a colorful residual VP6 image. A gray solid line that stretches across the *entire* monitor is not characteristic of a stale Paramount frame. The capture does **not** by itself prove which Wine/XWayland/X11 event causes the line.
 
-**Next discriminating step:** correlate the video timestamp of the second overlay with `GF-DDRAW-WINDOW: opened` and `closed` entries from the **same game run**. Previous logs from different runs must not be assumed temporally aligned with this capture. Then instrument or adjust popup mapping/presentation order only if correlation supports it. Preserve default layered alpha 254/255 and keep the 255/255 diagnostic disabled.
+**Same-run log available (2026-11-01 01:03:50):** the Wine log corresponding to the user's capture reports `GF-DDRAW-WINDOW: opened` at 53031.033, `closed` at 53047.791, and the second `opened` at 53048.191, a **400 ms window-free interval**. No `err:ddraw` messages were reported. The recording's 18.100–18.117-second flash and the second window opening are consistent with a transition-boundary artifact, although there is not yet an absolute clock mapping that proves frame-exact temporal coincidence.
+
+**Next diagnostic:** a new opt-in `GF_DDRAW_DEFER_SHOW=1` flag changes the popup order: create/position the popup *hidden*, rebind the DirectDraw swapchain, submit the initial overlay blit, and **only then** show it. This tests whether presenting an as-yet-uninitialized popup exposes a right-edge stripe. This ordering is a hypothesis, not a proven fix; WineD3D may queue the blit asynchronously, and rendering while hidden might fail on some backends. The mode must be used only for A/B testing, with the established 254/255 alpha unchanged. If it regresses video playback or fails to eliminate the flash, disable the variable; the default path remains untouched.
 
 ## Remaining work before marking the PR ready
 
 - [Build completed] The clean `0076` patch compiled and was loaded (verified with `opacity=255/255`), but further runtime/regression validation is required.
 - Confirm that the change to `device_parent_mode_changed()` avoids `Failed to resize window` and does not break fullscreen restoration.
 - Verify multiple FMVs, black transitions, gameplay return, focus changes, resizing, and window destruction.
-- Correlate the precisely measured two-frame 3px border flash at 18.100–18.117 s with window mapping/show and overlay lifecycle events from the same run; the previous opaque test did not eliminate it.
+- Compare default presentation with the opt-in deferred-show experiment during the measured 3px, two-frame fade transition; confirm frame timing and ensure the test does not reintroduce slowdown.
 - Check behavior with other display servers, compositors, resolutions, and WineD3D backends.
 - Keep the workaround game-scoped or opt-in until broader compatibility is established; never replace the stock build solely on this evidence.
 
