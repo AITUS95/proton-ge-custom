@@ -164,7 +164,7 @@ case "$(uname -m)" in
 esac
 
 tarball_url=$(echo "$release_json" |
-    grep browser_download_url |
+    grep -o '"browser_download_url": *"[^"]*"' |
     cut -d\" -f4 |
     grep -E "$tarball_pattern" |
     head -n1 || true)
@@ -185,7 +185,7 @@ fi
 
 # Resolve checksum URL
 checksum_url=$(echo "$release_json" |
-    grep browser_download_url |
+    grep -o '"browser_download_url": *"[^"]*"' |
     cut -d\" -f4 |
     grep "$release_name.sha512sum$" || true)
 
@@ -322,7 +322,7 @@ case "$(uname -m)" in
 esac
 
 tarball_url=$(echo "$release_json" |
-    grep browser_download_url |
+    grep -o '"browser_download_url": *"[^"]*"' |
     cut -d\" -f4 |
     grep -E "$tarball_pattern" |
     head -n1 || true)
@@ -343,7 +343,7 @@ fi
 
 # Resolve checksum URL
 checksum_url=$(echo "$release_json" |
-    grep browser_download_url |
+    grep -o '"browser_download_url": *"[^"]*"' |
     cut -d\" -f4 |
     grep "$release_name.sha512sum$" || true)
 
@@ -665,6 +665,10 @@ Without HIDRAW access, Wine retains its normal SDL fallback, which does not prov
 | `streamline`         | `PROTON_STREAMLINE_UPGRADE`    | Download a newer NVIDIA Streamline (`sl.*.dll`) and load it instead of the game's copy, for games whose Streamline is too old for driver DLSS overrides (e.g. DLSS Multi Frame Generation). A specific version can be given instead of `1`. Not combined with OptiScaler. |
 | `sdlinput`           | `PROTON_USE_SDL` or `PROTON_PREFER_SDL` | Uses SDL input instead of HIDRAW/Steam Input. |
 |                      | `PROTON_SONY_DUALSENSE_EDGE_AS_DUALSENSE` | Expose a native DualSense Edge as a regular DualSense to games without Edge support. Enabled automatically for Diablo IV; set to `0` to disable. Skipped when a Steam Input virtual controller is present. Physical controller identity and native reports are preserved for audio, haptics, and hotplug handling. |
+|                      | `PROTON_DUALSENSE_BT_AS_USB` | Enabled by default when Steam Input is disabled for the game: a Bluetooth-connected DualSense or DualSense Edge is presented to games as a wired (USB) controller, so games that only support the USB protocol get adaptive triggers, lightbar, player LEDs, rumble, motion and touchpad over Bluetooth. Set to `0` to keep the Bluetooth report layout. |
+|                      | `PROTON_DUALSENSE_BT_HAPTICS` | Enabled by default together with `PROTON_DUALSENSE_BT_AS_USB`: games get the controller's four-channel audio endpoint and its HD haptics (channels 3 and 4) are sent to the Bluetooth controller. Controller speaker audio is not sent over Bluetooth. Set to `0` to disable. |
+|                      | `PROTON_DUALSHOCK4_BT_AS_USB` | Enabled by default when Steam Input is disabled for the game: a Bluetooth-connected DualShock 4 is presented to games as a wired (USB) controller with the USB report layout, so games that only handle a wired DualShock 4 get correct input, rumble, lightbar, motion and touchpad over Bluetooth. Set to `0` to keep the Bluetooth report layout. |
+|                      | `PROTON_DUALSHOCK4_BT_AUDIO` | Enabled by default together with `PROTON_DUALSHOCK4_BT_AS_USB`: games get the controller's stereo speaker and headset microphone endpoints. Speaker audio is sent to the Bluetooth controller's speaker, or to a headset plugged into the controller, and the microphone of a plugged-in headset is captured over Bluetooth. Set to `0` to disable. |
 |                      | `PROTON_SONY_DUALSENSE_AS_DUALSHOCK4` | Set to `1` to expose a DualSense or DualSense Edge as a DualShock 4 v2. Use this for older games that support DS4 correctly but have missing or broken DualSense mappings. This preserves the game's DS4 button mappings and icons while translating input, rumble, lightbar, and feature reports. When the Steam Input fallback is active, it also advertises the detected DualSense as a DS4 profile. |
 |                      | `PROTON_SONY_DUALSHOCK4_V2_AS_V1` | Set to `1` to expose a DualShock 4 v2 as a DualShock 4 v1. When combined with `PROTON_SONY_DUALSENSE_AS_DUALSHOCK4=1`, a DualSense or DualSense Edge is exposed directly as DS4 v1. Input, output, feature reports, controller audio, haptics, and hotplug handling continue to use the physical controller internally. |
 |                      | `PROTON_STEAM_INPUT_XBOX_PROMPTS` | Set to `1` to report a Steam Deck or Steam Controller to the game as an Xbox One controller through Steam Input, for games that otherwise show keyboard prompts. Enabled by default for Rune Factory 5. |

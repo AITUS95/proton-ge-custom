@@ -242,6 +242,24 @@ $(eval $(call rules-configure,libpcap,x86_64,unix))
 $(eval $(call rules-configure,libpcap,aarch64,unix))
 
 ##
+## sbc
+##
+
+# SBC encoder for Bluetooth DualShock 4 speaker audio, loaded at runtime by
+# winepulse.
+
+SBC_CONFIGURE_ARGS := \
+	--enable-shared \
+	--disable-static \
+	--disable-tools \
+	--disable-tester
+
+$(eval $(call rules-source,sbc,$(SRCDIR)/sbc))
+$(eval $(call rules-configure,sbc,i386,unix))
+$(eval $(call rules-configure,sbc,x86_64,unix))
+$(eval $(call rules-configure,sbc,aarch64,unix))
+
+##
 ## graphene
 ##
 
@@ -441,13 +459,13 @@ $(eval $(call rules-makedep,lsteamclient,aarch64))
 
 ##
 ## openxr
-## Note 32-bit is not supported by SteamVR, so we don't build it.
+## 32-bit is built for the decoupled wineopenxr (i386 apps without WoW64).
 ##
 
 OPENXR_CMAKE_ARGS = -DHAVE_FILESYSTEM_WITHOUT_LIB=0
 
 $(eval $(call rules-source,openxr,$(SRCDIR)/OpenXR-SDK))
-# $(eval $(call rules-cmake,openxr,i386,unix))
+$(eval $(call rules-cmake,openxr,i386,unix))
 $(eval $(call rules-cmake,openxr,x86_64,unix))
 $(eval $(call rules-cmake,openxr,aarch64,unix))
 
@@ -641,7 +659,7 @@ WINE_x86_64_AUTOCONF_ARGS += \
   VKD3D_PE_LIBS="-L$(VKD3D_x86_64_LIBDIR) -lvkd3d -lvkd3d-shader -lvkd3d-utils"
 
 WINE_DEPENDS = ffmpeg openfst kaldi vosk libxml2 libxkbcommon libpcap
-WINE_i386_DEPENDS = vkd3d
+WINE_i386_DEPENDS = vkd3d openxr
 WINE_x86_64_DEPENDS = piper vkd3d openxr
 WINE_aarch64_DEPENDS = piper openxr
 

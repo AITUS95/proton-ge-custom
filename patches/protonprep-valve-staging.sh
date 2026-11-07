@@ -594,6 +594,12 @@ apply_all_in_dir() {
     echo "WINE: expose native DualSense Edge as DualSense for Diablo IV"
     apply_patch "../patches/wine-hotfixes/pending/winebus-diablo-iv-dualsense-edge-identity.patch"
 
+    echo "WINE: expose Bluetooth DualSense controllers as USB when Steam Input is disabled"
+    apply_patch "../patches/wine-hotfixes/pending/winebus-expose-bluetooth-dualsense-as-usb.patch"
+
+    echo "WINE: send DualSense haptics and speaker audio to Bluetooth controllers"
+    apply_patch "../patches/wine-hotfixes/pending/winepulse-bluetooth-dualsense-haptics.patch"
+
     echo "WINE: -HOTFIX- ntdll: skip needless wake in RtlReleaseSRWLockShared (ValveSoftware/wine#367)"
     apply_patch "../patches/wine-hotfixes/pending/ntdll-srwlock-skip-needless-shared-release-wake.patch"
 
@@ -678,6 +684,39 @@ apply_all_in_dir() {
     # https://github.com/ValveSoftware/Proton/issues/7486#issuecomment-6594771550
     echo "WINE: -PENDING- ntdll: let a thread killed during its startup exit instead of hanging (Helldivers 2 thread growth)"
     apply_patch "../patches/wine-hotfixes/pending/ntdll-dont-keep-reply-pipe-open-during-thread-init.patch"
+
+    # NtCreateThreadEx() fails with STATUS_INVALID_CID when the server drains a stale fd
+    echo "WINE: -PENDING- server: keep the request's status when receive_fd() drops a stale fd (spurious thread creation failures)"
+    apply_patch "../patches/wine-hotfixes/pending/server-keep-request-status-when-dropping-stale-fd.patch"
+
+    # The killed-thread freeing (#917 follow-up) can put a TEB on its list twice
+    echo "WINE: -PENDING- ntdll: don't queue a killed thread twice for freeing (double free under thread churn)"
+    apply_patch "../patches/wine-hotfixes/pending/ntdll-dont-queue-a-killed-thread-twice.patch"
+
+    # https://github.com/GloriousEggroll/proton-ge-custom/issues/937
+    apply_patch "../patches/wine-hotfixes/pending/winewayland-use-steam-app-id-as-app-id.patch"
+
+    # https://github.com/ValveSoftware/Proton/issues/9994
+    echo "WINE: -HOTFIX- Use the exe name as WM_CLASS/app ID when SteamAppId is 0 or default (umu)"
+    apply_patch "../patches/wine-hotfixes/pending/winex11-winewayland-use-exe-name-for-non-steam-app-ids.patch"
+
+    # https://github.com/GloriousEggroll/proton-ge-custom/issues/877
+    apply_patch "../patches/wine-hotfixes/pending/win32u-winewayland-add-focus-debug-channel.patch"
+    # AION 2 (#877): deactivate when the host focus loss cannot set the desktop foreground
+    apply_patch "../patches/wine-hotfixes/pending/win32u-deactivate-window-when-host-focus-loss-fails.patch"
+
+    # PROTON_PREFER_SDL / Steam Deck: Sony pads were dropped by both hidraw and SDL
+    apply_patch "../patches/wine-hotfixes/pending/winebus-sdl-keep-sony-pads-when-hidraw-is-disabled.patch"
+    # Bluetooth DualShock 4 presented as a wired one, like the DualSense
+    apply_patch "../patches/wine-hotfixes/pending/winebus-expose-bluetooth-dualshock4-as-usb.patch"
+    apply_patch "../patches/wine-hotfixes/pending/winepulse-bluetooth-dualshock4-audio.patch"
+    apply_patch "../patches/wine-hotfixes/pending/winedmo-disable-d3d11-aware-for-phantom-blade-zero.patch"
+    # Le Mans Ultimate VR loads a .cur cursor through D3DX (#944)
+    apply_patch "../patches/wine-hotfixes/pending/d3dx-cur-ico-loading-for-le-mans-ultimate.patch"
+    apply_patch "../patches/wine-hotfixes/pending/d3dx-cur-ico-bounds-and-cursor-alpha-for-le-mans-ultimate.patch"
+    # Le Mans Ultimate: online key derivation and wheel reconnection (#777, #944)
+    apply_patch "../patches/wine-hotfixes/pending/bcrypt-kdf-secret-append-for-le-mans-ultimate.patch"
+    apply_patch "../patches/wine-hotfixes/pending/dinput-find-hotplugged-devices-for-le-mans-ultimate.patch"
 
     echo "WINE: RUN AUTOCONF TOOLS/MAKE_REQUESTS"
     autoreconf -f
