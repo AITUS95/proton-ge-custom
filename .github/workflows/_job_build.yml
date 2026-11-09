@@ -50,6 +50,9 @@ jobs:
           fetch-tags: true
           submodules: false
 
+      - name: Ensure a version tag exists (forks without tags)
+        run: git describe --tags >/dev/null 2>&1 || git tag custom-build
+
       - name: Patch
         run: |
           git submodule update --init --filter=tree:0 --recursive

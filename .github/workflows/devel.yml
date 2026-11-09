@@ -1,6 +1,13 @@
 name: Development
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      custom_name:
+        description: Optional custom build name (letters, digits, dashes)
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: ${{ github.ref_name }}
@@ -27,6 +34,7 @@ jobs:
       id: version
       shell: bash
       run: |
+        git describe --tags >/dev/null 2>&1 || git tag custom-build
         tag_abbrev=$(git describe --tags --abbrev=0)
         echo "tag_abbrev=$tag_abbrev" >> $GITHUB_OUTPUT
         echo "tag_offset=$(git rev-list $tag_abbrev..HEAD --count)" >> $GITHUB_OUTPUT
@@ -39,5 +47,5 @@ jobs:
     needs: version
     uses: ./.github/workflows/_job_build.yml
     with:
-      name: ${{ needs.version.outputs.full_desc }}-${{ needs.version.outputs.branch }}
+      name: ${{ inputs.custom_name != '' && inputs.custom_name || format('{0}-{1}', needs.version.outputs.full_desc, needs.version.outputs.branch) }}
 
