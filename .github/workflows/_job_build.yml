@@ -62,6 +62,35 @@ jobs:
           patch -Np1 -i ./.github/patches/0001-build-strip-binaries-early.patch
           mkdir ./build
 
+      - name: Stage ONNX Runtime for Piper
+        run: |
+          # The GitHub release URL for this version returns 404.
+          version=1.14.1
+          package="$RUNNER_TEMP/onnxruntime.$version.nupkg"
+          sdk_dir="$PWD/build/onnxruntime"
+          curl --fail --show-error --silent --location --retry 3 \
+            "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/$version/microsoft.ml.onnxruntime.$version.nupkg" \
+            --output "$package"
+          printf '%s  %s\n' 3a277421efce94b5f91f4a5dc8efc1add99b4c01f547279d81098ffb4fafbb6d "$package" | sha256sum --check
+
+          mkdir -p "$sdk_dir/include" "$sdk_dir/lib"
+          unzip -jq "$package" 'build/native/include/*.h' -d "$sdk_dir/include"
+          unzip -jq "$package" 'runtimes/linux-x64/native/libonnxruntime.so' -d "$sdk_dir/lib"
+          mv "$sdk_dir/lib/libonnxruntime.so" "$sdk_dir/lib/libonnxruntime.so.$version"
+          ln -s "libonnxruntime.so.$version" "$sdk_dir/lib/libonnxruntime.so"
+
+          python3 - <<'PYTHON'
+          from pathlib import Path
+
+          cmake = Path('piper/CMakeLists.txt')
+          contents = cmake.read_text()
+          install_prefix = '    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${PIPER_PHONEMIZE_DIR}\n'
+          if contents.count(install_prefix) != 1:
+              raise SystemExit('Expected one Piper phonemize ExternalProject install argument')
+          runtime = Path('build/onnxruntime').resolve()
+          cmake.write_text(contents.replace(install_prefix, install_prefix + f'               "-DONNXRUNTIME_DIR:PATH={runtime}"\n'))
+          PYTHON
+
       - name: Configure
         working-directory: ./build
         run: |
