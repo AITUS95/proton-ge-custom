@@ -10,7 +10,8 @@ on:
 jobs:
   proton:
     name: Build ${{ inputs.name }}
-    runs-on: ubuntu-latest
+    # Docker 29.4.2 on Ubuntu 26.04 breaks 32-bit socket calls.
+    runs-on: ubuntu-24.04
     steps:
       - name: Cleanup disk space
         uses: endersonmenezes/free-disk-space@v3
@@ -95,6 +96,51 @@ jobs:
         working-directory: ./build
         run: |
           ../configure.sh --build-name=${{ inputs.name }} --container-engine=docker
+
+      - name: Check Steam Runtime SDK Unix sockets
+        working-directory: ./build
+        run: |
+          docker version --format '{{.Server.Version}}'
+          sdk_image=$(make --silent get-steamrt-image)
+          docker run --rm -i --user "$(id -u):$(id -g)" --entrypoint /bin/bash "$sdk_image" -se <<'PROBE'
+          probe_dir=$(mktemp -d)
+          cat > "$probe_dir/socket.c" <<'C'
+          #include <stdio.h>
+          #include <sys/socket.h>
+          #include <unistd.h>
+          #if defined(__i386__)
+          #include <linux/net.h>
+          #include <sys/syscall.h>
+          #endif
+
+          int main(void)
+          {
+              int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+              if (fd == -1)
+              {
+                  perror("socket(AF_UNIX)");
+                  return 1;
+              }
+              close(fd);
+          #if defined(__i386__)
+              unsigned long args[] = {AF_UNIX, SOCK_STREAM, 0};
+              fd = syscall(SYS_socketcall, SYS_SOCKET, args);
+              if (fd == -1)
+              {
+                  perror("socketcall(AF_UNIX)");
+                  return 1;
+              }
+              close(fd);
+          #endif
+              return 0;
+          }
+          C
+          for compiler in x86_64-linux-gnu-gcc i686-linux-gnu-gcc; do
+            echo "Checking Unix sockets with $compiler"
+            "$compiler" -static "$probe_dir/socket.c" -o "$probe_dir/socket-test"
+            "$probe_dir/socket-test"
+          done
+          PROBE
 
       - name: Make ${{ inputs.name }}
         working-directory: ./build
